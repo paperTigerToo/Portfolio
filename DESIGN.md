@@ -94,7 +94,8 @@ One file holding an ordered array. Each entry: `title`, `url`, and optional `tag
 
 - Static site: Vite + TypeScript, no UI framework, deployed to GitHub Pages by a GitHub Action.
 - The Field is one full-screen raymarched fragment shader (three.js), with Blob positions driven by a small physics simulation on the CPU. Contact flattening is done by passing each Blob's nearest contact planes to the shader.
-- Slow devices: render resolution steps down automatically to hold frame rate. If WebGL is unavailable, the Index is shown alone.
+- Slow devices: render resolution steps down automatically to hold frame rate, deciding within the first second, and climbs back when frames are fast. If WebGL is unavailable, the Index is shown alone.
+- Startup: the shader compiles before the first frame (in parallel where the browser allows), the physics runs 1.5 s ahead so Blobs start settled, and the Field fades in over 0.9 s once frames are steady. The corner text shows immediately; there is no loading screen.
 - The Index is real links in the page, readable by screen readers and search engines.
 - Hosting: GitHub Pages from the `Portfolio` repository; `.github/workflows/pages.yml` deploys the `site/` folder on every push to `main`.
 - **Open:** custom domain. Nothing else depends on it.
@@ -126,6 +127,7 @@ Newest last. Record what was chosen, what was rejected, and why.
 - **2026-11-12 — Light falloff behind text, not difference blending** (round 04). Inverting text failed over a Blob's grey mid-tones. Dimming the Blobs behind the text strips works at every tone and reads as the Blobs leaving the light. Supersedes the round 01 difference-blending decision. Rejected: keeping Blobs out of the text strips, because the Stream has to carry Blobs through the top and bottom edges.
 - **2026-11-12 — Owner signed off the round 04 final candidate** as the target the real site must match.
 - **2026-11-25 — No dates on Projects.** Owner removed the year from the Project List, the Label and the Index.
+- **2026-11-25 — Fade-in, not a loading screen.** Owner reported a laggy first load and first motion. Causes: a heavy first frame (shader compile) and a quality step-down too slow to catch up (about 3.5 s per step at 80 ms frames). Fixed by compiling ahead, removing unused material code from the shader, skipping Blobs too far away to matter, faster quality decisions and a fade-in. A full loading screen was rejected because the corner text can show at once.
 - **2026-11-25 — Published the signed-off page as the live site** (`site/`) on GitHub Pages, ahead of the Vite + TypeScript rewrite, so the site is online now. The rewrite replaces `site/` when it lands.
 
 ## For future agents
