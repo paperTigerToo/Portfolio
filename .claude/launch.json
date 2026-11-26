@@ -7,11 +7,11 @@
       "runtimeArgs": [
         "-m",
         "http.server",
-        "5173",
+        "5180",
         "--directory",
         "mockups"
       ],
-      "port": 5173
+      "port": 5180
     },
     {
       "name": "site",
