@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Portfolio mockup — round 01</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400&family=JetBrains+Mono:wght@400&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --carbon: #12130f;
+    --bone: #e4dfda;
+    --vein: #3c3c38;
+    --rose: #f5c2c8;
+    --font-display: 'VT323', 'Departure Mono', monospace;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+    --font-body: 'Inter', system-ui, sans-serif;
+    --pad: 12px;
+    --gap: 4px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; font-weight: 400; }
+  html, body { height: 100%; overflow: hidden; background: var(--carbon); color: var(--bone); }
+  body { font: 16px/1.25 var(--font-body); overscroll-behavior: none; }
+  a { color: inherit; }
+  canvas#field { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  .tele { font: 12px/1.25 var(--font-mono); letter-spacing: -0.6px; text-transform: uppercase; }
+  .corner { mix-blend-mode: difference; position: fixed; display: flex; flex-direction: column; gap: var(--gap); pointer-events: none; z-index: 2; }
+  .corner a, .corner button { pointer-events: auto; }
+  .tl { top: var(--pad); left: var(--pad); }
+  .tr { top: var(--pad); right: var(--pad); align-items: flex-end; }
+  .bl { bottom: var(--pad); left: var(--pad); max-width: 70vw; }
+  .br { bottom: var(--pad); right: var(--pad); align-items: flex-end; }
+  .wordmark { font: 40px/0.7 var(--font-display); text-decoration: none; padding-top: 6px; }
+  .clock { font: 80px/0.7 var(--font-display); padding: 10px 0 6px; }
+  .clock small { font-size: 30px; }
+  .pill {
+    font: 12px/1.25 var(--font-mono); letter-spacing: -0.6px; text-transform: uppercase;
+    color: var(--bone); background: transparent; border: 0; border-radius: 9999px;
+    padding: 8px 12px; text-decoration: none; cursor: pointer;
+  }
+  .pill:hover, .pill:focus-visible { outline: 1px solid var(--vein); }
+  .variants { display: flex; gap: var(--gap); align-items: center; }
+  .variants a[aria-current] { outline: 1px solid var(--bone); }
+  .bl .pill, .br .pill, .tr .pill { margin-right: -12px; }
+  .bl .pill { margin: 0 0 0 -12px; }
+
+  #label { mix-blend-mode: difference;
+    position: fixed; z-index: 3; left: 0; top: 0; max-width: 240px;
+    display: flex; flex-direction: column; gap: var(--gap); align-items: flex-start;
+    pointer-events: none; opacity: 0; transition: opacity .15s;
+  }
+  #label.on { opacity: 1; }
+  #label .title { font: 30px/1.13 var(--font-body); }
+  #label .open { display: none; pointer-events: auto; outline: 1px solid var(--bone); margin-top: var(--gap); }
+  #label.touch .open { display: inline-block; }
+
+  #index {
+    position: fixed; inset: 0; z-index: 4; background: var(--carbon);
+    padding: 64px var(--pad) var(--pad); overflow: auto; display: none;
+  }
+  body.index-open #index, body.nofield #index { display: block; }
+  #index ol { list-style: none; display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+  #index li { display: flex; flex-direction: column; gap: var(--gap); }
+  #index li a { font: 30px/1.13 var(--font-body); text-decoration-thickness: 2px; text-underline-offset: 4px; border-radius: 2px; }
+  body.index-open .tr, body.nofield .tr { z-index: 5; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+</style>
+</head>
+<body class="nofield">
+
+<canvas id="field" aria-hidden="true"></canvas>
+
+<div class="corner tl"><a class="wordmark" href="#">YOUR NAME</a></div>
+
+<div class="corner tr">
+  <button class="pill" id="indexBtn" aria-expanded="false" aria-controls="index">Index</button>
+  <div class="variants tele" id="variants"></div>
+</div>
+
+<div class="corner bl">
+  <span class="tele" id="tz">Local time</span>
+  <div class="clock" id="clock">00:00<small> AM</small></div>
+  <p>One-line bio goes here — what you build and what you care about.</p>
+  <span class="tele">City, Region — Role / Discipline</span>
+  <span class="tele" id="hint">Scroll, swipe or use arrow keys to stream · drag a blob to fling it</span>
+</div>
+
+<div class="corner br">
+  <a class="pill" href="#">Github</a>
+  <a class="pill" href="#">LinkedIn</a>
+  <a class="pill" href="#">Email</a>
+</div>
+
+<div id="label" role="status">
+  <span class="tele meta"></span>
+  <span class="title"></span>
+  <span class="blurb"></span>
+  <span class="tele tags"></span>
+  <a class="pill open" target="_blank" rel="noopener">Open ↗</a>
+</div>
+
+<nav id="index" aria-label="Project index">
+  <span class="tele">Index — all projects</span>
+  <ol id="indexList"></ol>
+</nav>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+/* ───────────── The Project List: the only thing edited to add work ───────────── */
+const PROJECTS = [
+  { title: 'Project One',   url: 'https://example.com/project-one',   year: 2026, tags: ['webgl', 'typescript'], blurb: 'Placeholder blurb. One sentence on what this is and why it matters.' },
+  { title: 'Project Two',   url: 'https://example.com/project-two',   year: 2025, tags: ['tooling'],             blurb: 'Placeholder blurb. Another short line about the work.' },
+  { title: 'Project Three', url: 'https://example.com/project-three', year: 2024, tags: ['design', 'audio'],     blurb: 'Placeholder blurb. Keep these to a sentence.' },
+];
+
+/* ───────────── Mockup variant (the only line that differs between A / B / C) ───────────── */
+const MATERIAL = 0; // @@MATERIAL
+const VARIANTS = [
+  { file: 'a-matte-clay.html',      name: 'A · Matte clay' },
+  { file: 'b-glossy-wet.html',      name: 'B · Glossy wet' },
+  { file: 'c-translucent-gel.html', name: 'C · Translucent gel' },
+];
+
+/* ───────────── Corner chrome ───────────── */
+const $ = (s) => document.querySelector(s);
+$('#variants').innerHTML = VARIANTS.map((v, i) =>
+  `<a class="pill" href="${v.file}" ${i === MATERIAL ? 'aria-current="page"' : ''}>${v.name}</a>`).join('');
+$('#indexList').innerHTML = PROJECTS.map((p, i) =>
+  `<li><span class="tele">${String(i + 1).padStart(2, '0')} / ${p.year ?? ''} ${p.tags ? '· ' + p.tags.join(' · ') : ''}</span>
+   <a href="${p.url}" target="_blank" rel="noopener">${p.title}</a><span>${p.blurb ?? ''}</span></li>`).join('');
+$('#indexBtn').addEventListener('click', () => {
+  const open = document.body.classList.toggle('index-open');
+  $('#indexBtn').setAttribute('aria-expanded', open);
+  $('#indexBtn').textContent = open ? 'Close' : 'Index';
+});
+function tick() {
+  const d = new Date();
+  let h = d.getHours(); const ap = h < 12 ? 'AM' : 'PM'; h = h % 12 || 12;
+  $('#clock').innerHTML = `${String(h).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}<small> ${ap}</small>`;
+  const off = -d.getTimezoneOffset(); const s = off < 0 ? '-' : '+';
+  $('#tz').textContent = `Local time (UTC${s}${Math.floor(Math.abs(off) / 60)}:${String(Math.abs(off) % 60).padStart(2, '0')})`;
+}
+tick(); setInterval(tick, 1000);
+
+/* ───────────── Seeded randomness ───────────── */
+function rng(str) {
+  let h = 1779033703 ^ str.length;
+  for (let i = 0; i < str.length; i++) { h = Math.imul(h ^ str.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); }
+  let a = h >>> 0;
+  return () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+const mod = (n, m) => ((n % m) + m) % m;
+
+/* ───────────── Renderer ───────────── */
+const MAXN = 8;
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const canvas = $('#field');
+let renderer;
+try { renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' }); }
+catch (e) { throw new Error('WebGL unavailable — Index shown instead'); }
+document.body.classList.remove('nofield');
+
+let quality = 1;
+const basePR = Math.min(devicePixelRatio || 1, 1.5);
+const v4s = (n) => Array.from({ length: n }, () => new THREE.Vector4(0, 0, 0, 1e3));
+const uniforms = {
+  uBlobs: { value: v4s(MAXN) }, uShape: { value: v4s(MAXN) }, uPlanes: { value: v4s(MAXN * 3) },
+  uCount: { value: 0 }, uTime: { value: 0 }, uAspect: { value: 1 }, uPx: { value: 0.002 },
+  uWob: { value: REDUCED ? 0.03 : 0.085 }, uMat: { value: MATERIAL },
+};
+const frag = /* glsl */`
+precision highp float;
+#define MAXN ${MAXN}
+uniform vec4 uBlobs[MAXN];
+uniform vec4 uShape[MAXN];
+uniform vec4 uPlanes[MAXN*3];
+uniform int uCount; uniform int uMat;
+uniform float uTime, uAspect, uPx, uWob;
+varying vec2 vUv;
+
+const vec3 CARBON = vec3(0.071, 0.075, 0.059);
+const vec3 BONE   = vec3(0.894, 0.875, 0.855);
+const vec3 ROSE   = vec3(0.961, 0.761, 0.784);
+const vec3 KEY    = vec3(-0.485, 0.680, 0.550);   // the one warm light, upper left
+const vec3 RIM    = vec3(0.740, -0.560, -0.370);  // rose bleed, low right, from behind
+
+float smax(float a, float b, float k){ float h = clamp(0.5 + 0.5*(a-b)/k, 0., 1.); return mix(b, a, h) + k*h*(1.-h); }
+
+float sdBlob(vec3 p, int i){
+  vec4 B = uBlobs[i]; vec4 S = uShape[i];
+  vec3 q = p - B.xyz; float r = B.w;
+  vec3 e = q / vec3(S.y, S.z, 1.0);
+  float f = 2.4 / r;
+  float w  = sin(q.x*f + uTime*0.60 + S.x) * sin(q.y*f*0.9 - uTime*0.50 + S.x*1.7) * sin(q.z*f*1.1 + uTime*0.40 + S.x*2.3);
+  float w2 = sin(q.x*f*0.5 - uTime*0.30 + S.x*3.1) * sin(q.y*f*0.6 + uTime*0.25 + S.x*0.7);
+  float d = (length(e) - r) * min(S.y, S.z) - r*uWob*(w + 0.8*w2);
+  // contact planes: where a neighbour presses in, the body flattens against it instead of fusing
+  for (int k = 0; k < 3; k++){ vec4 P = uPlanes[i*3 + k]; d = smax(d, dot(q, P.xyz) - P.w, 0.14*r); }
+  return d;
+}
+float map(vec3 p, int ex, out int id){
+  float d = 1e9; id = -1;
+  for (int i = 0; i < MAXN; i++){
+    if (i >= uCount) break;
+    if (i == ex) continue;
+    float di = sdBlob(p, i);
+    if (di < d){ d = di; id = i; }
+  }
+  return d;
+}
+vec3 normalAt(vec3 p, int ex){
+  int id; vec2 e = vec2(1., -1.) * 0.0025;
+  return normalize(e.xyy*map(p + e.xyy, ex, id) + e.yyx*map(p + e.yyx, ex, id) +
+                   e.yxy*map(p + e.yxy, ex, id) + e.xxx*map(p + e.xxx, ex, id));
+}
+bool march(vec3 ro, int ex, out vec3 p, out int id, out float minD){
+  float t = 0.; minD = 1e9;
+  for (int s = 0; s < 56; s++){
+    p = ro + vec3(0., 0., -t);
+    float d = map(p, ex, id);
+    minD = min(minD, d);
+    if (d < 0.0015) return true;
+    t += d * 0.72;
+    if (t > 2.6) break;
+  }
+  return false;
+}
+
+vec3 shadeClay(vec3 p, vec3 n, int id, float hover){
+  int j;
+  float diff = clamp((dot(n, KEY) + 0.35) / 1.35, 0., 1.);
+  float ao = clamp(map(p + n*0.07, -1, j) / 0.07, 0., 1.);
+  float fres = pow(1. - clamp(n.z, 0., 1.), 2.5);
+  float rim = fres * smoothstep(-0.2, 0.7, dot(n, RIM));
+  vec3 col = BONE * (0.07 + 0.93*diff*diff) * mix(0.45, 1., ao);
+  col += ROSE * rim * (0.45 + 1.1*hover);
+  col += BONE * hover * 0.06;
+  return col;
+}
+vec3 envWet(vec3 r){
+  float box = smoothstep(0.80, 0.86, dot(r, KEY));                    // softbox
+  float strip = smoothstep(0.06, 0.0, abs(r.y + 0.35)) * smoothstep(-0.2, 0.6, r.x); // low rose strip
+  float sky = smoothstep(-0.3, 1.0, r.y) * 0.10;
+  return BONE*(box*1.25 + sky) + ROSE*strip*0.9;
+}
+vec3 shadeWet(vec3 p, vec3 n, int id, float hover){
+  int j;
+  float diff = clamp((dot(n, KEY) + 0.2) / 1.2, 0., 1.);
+  float ao = clamp(map(p + n*0.07, -1, j) / 0.07, 0., 1.);
+  float fres = pow(1. - clamp(n.z, 0., 1.), 4.0);
+  vec3 r = reflect(vec3(0., 0., -1.), n);
+  vec3 col = BONE * (0.04 + 0.50*diff*diff) * mix(0.4, 1., ao);
+  col += envWet(r) * (0.35 + 0.65*fres);
+  col += BONE * pow(max(dot(r, KEY), 0.), 180.) * 1.5;
+  col += ROSE * fres * smoothstep(-0.2, 0.7, dot(n, RIM)) * (0.55 + 1.2*hover);
+  return col;
+}
+
+void main(){
+  vec2 xy = (vUv*2. - 1.) * vec2(uAspect, 1.);
+  vec3 col = CARBON;
+  bool near = false;
+  for (int i = 0; i < MAXN; i++){ if (i >= uCount) break; if (length(xy - uBlobs[i].xy) < uBlobs[i].w*1.6) near = true; }
+  if (near){
+    vec3 p; int id; float md;
+    if (march(vec3(xy, 1.3), -1, p, id, md)){
+      vec3 n = normalAt(p, -1);
+      float hover = uShape[id].w;
+      if (uMat == 0) col = shadeClay(p, n, id, hover);
+      else if (uMat == 1) col = shadeWet(p, n, id, hover);
+      else {
+        // gel: see through the body, bent a little, to whatever is behind it
+        float fres = pow(1. - clamp(n.z, 0., 1.), 2.2);
+        vec3 behind = CARBON; vec3 p2; int id2; float md2;
+        if (march(vec3(p.xy - n.xy*0.09, p.z), id, p2, id2, md2)){
+          behind = shadeClay(p2, normalAt(p2, id), id2, uShape[id2].w) * 0.8;
+        }
+        float diff = clamp((dot(n, KEY) + 0.5) / 1.5, 0., 1.);
+        vec3 r = reflect(vec3(0., 0., -1.), n);
+        float T = 0.78 * (1. - fres);
+        vec3 body = BONE*(0.10 + 0.22*diff) + ROSE*0.05;
+        col = behind*T + body*(1. - 0.55*T);
+        col += BONE * fres * 0.55 * smoothstep(-0.6, 0.8, dot(n, KEY));
+        col += ROSE * fres * smoothstep(-0.2, 0.7, dot(n, RIM)) * (0.7 + 1.2*hover);
+        col += BONE * pow(max(dot(r, KEY), 0.), 120.) * 1.3;
+        col += BONE * hover * 0.05;
+      }
+    } else {
+      col = mix(CARBON, BONE*0.35 + ROSE*0.25, (1. - smoothstep(0., uPx*1.5, md)) * 0.6);
+    }
+  }
+  gl_FragColor = vec4(clamp(col, 0., 1.), 1.);
+}`;
+const scene = new THREE.Scene();
+const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
+  uniforms, fragmentShader: frag,
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }',
+})));
+
+/* ───────────── The Field: Slots, Blobs, Stream ───────────── */
+let W = 1, H = 1, aspect = 1, N = 7, rBase = 0.3, margin = 0.5;
+let blobs = [], lo = 0, hi = 0, streamVel = 0, time = 0;
+
+function dress(b, streamIndex) {            // give a Slot's Blob its Project and Seed
+  const proj = mod(streamIndex, PROJECTS.length);
+  const r = rng(PROJECTS[proj].title + ':' + streamIndex);
+  Object.assign(b, { streamIndex, proj, rScale: 0.8 + 0.42 * r(), sx: 0.9 + 0.24 * r(), sy: 0.9 + 0.24 * r(),
+    phase: r() * 6.283, wx: r() * 6.283, wy: r() * 6.283, zph: r() * 6.283, xSeed: r() * 2 - 1 });
+  b.r = rBase * b.rScale;
+  return b;
+}
+function layout() {
+  W = innerWidth; H = innerHeight; aspect = W / H;
+  N = W < 700 ? 5 : 7;
+  rBase = Math.sqrt(1.25 * aspect / (Math.PI * N));
+  margin = rBase * 1.4 + 0.05;
+  renderer.setPixelRatio(basePR * quality); renderer.setSize(W, H, false);
+  uniforms.uAspect.value = aspect; uniforms.uPx.value = 2 / (H * basePR * quality);
+  if (blobs.length !== N) {
+    blobs = []; lo = 0; hi = N - 1;
+    for (let i = 0; i < N; i++) {
+      const b = dress({ vx: 0, vy: 0, hover: 0 }, i);
+      b.x = b.xSeed * (aspect - b.r); b.y = 1 - (i + 0.5) / N * 2;
+      blobs.push(b);
+    }
+  } else blobs.forEach((b) => { b.r = rBase * b.rScale; });
+  uniforms.uCount.value = N;
+}
+addEventListener('resize', layout); layout();
+
+const ptr = { x: 9, y: 9, down: false, moved: false, type: 'mouse', grab: null, sx: 0, sy: 0, lastY: 0, lastT: 0, inside: false };
+let hovered = null, selected = null;
+
+function step(dt) {
+  time += dt;
+  const idle = 1 - Math.min(1, Math.abs(streamVel) * 4) * 1;
+  const drift = REDUCED ? 0 : 0.07;
+  for (const b of blobs) {
+    let ax = drift * Math.sin(time * 0.21 + b.wx) + drift * 0.6 * Math.sin(time * 0.083 + b.wy * 2.0);
+    let ay = drift * Math.cos(time * 0.17 + b.wy) + drift * 0.6 * Math.cos(time * 0.097 + b.wx * 2.0);
+    const lx = Math.max(0.01, aspect - b.r * 0.85), ly = 1 - b.r * 0.6;
+    if (b.x > lx) ax -= 22 * (b.x - lx); if (b.x < -lx) ax -= 22 * (b.x + lx);
+    if (!ptr.streaming) { if (b.y > ly) ay -= 10 * idle * (b.y - ly); if (b.y < -ly) ay -= 10 * idle * (b.y + ly); }
+    if (ptr.inside && ptr.type === 'mouse' && !ptr.grab) {      // the cursor nudges bodies aside
+      const dx = b.x - ptr.x, dy = b.y - ptr.y, d = Math.hypot(dx, dy) || 1e-4, reach = b.r + 0.06;
+      if (d < reach && d > b.r * 0.55) { const f = 5 * (reach - d) / reach; ax += f * dx / d; ay += f * dy / d; }
+    }
+    b.ax = ax; b.ay = ay;
+  }
+  for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) {   // soft collisions: squish, never fuse
+    const a = blobs[i], c = blobs[j];
+    const dx = c.x - a.x, dy = c.y - a.y, d = Math.hypot(dx, dy) || 1e-4, o = a.r + c.r - d;
+    if (o <= 0) continue;
+    const nx = dx / d, ny = dy / d, ma = a.r * a.r, mc = c.r * c.r, k = 34 * o;
+    const rel = (c.vx - a.vx) * nx + (c.vy - a.vy) * ny, damp = 2.5 * rel;
+    a.ax -= (k - damp) * nx * mc / (ma + mc) * 2; a.ay -= (k - damp) * ny * mc / (ma + mc) * 2;
+    c.ax += (k - damp) * nx * ma / (ma + mc) * 2; c.ay += (k - damp) * ny * ma / (ma + mc) * 2;
+  }
+  const visc = Math.exp(-2.4 * dt);
+  const span = 2 + 2 * margin;
+  for (const b of blobs) {
+    if (b === ptr.grab && ptr.moved) { b.vx = (ptr.x - b.x) * 14; b.vy = (ptr.y - b.y) * 14; }
+    else { b.vx = (b.vx + b.ax * dt) * visc; b.vy = (b.vy + b.ay * dt) * visc; }
+    b.x += b.vx * dt; b.y += (b.vy + streamVel) * dt;
+    b.z = 0.10 * Math.sin(time * 0.31 + b.zph);
+    if (b.y > 1 + margin) { b.y -= span; hi++; lo++; dress(b, hi); b.x = b.xSeed * (aspect - b.r); if (selected === b) select(null); }
+    else if (b.y < -1 - margin) { b.y += span; lo--; hi--; dress(b, lo); b.x = b.xSeed * (aspect - b.r); if (selected === b) select(null); }
+    const want = (b === hovered || b === selected) ? 1 : 0;
+    b.hover += (want - b.hover) * Math.min(1, dt * 10);
+  }
+  streamVel *= Math.exp(-3.2 * dt);
+  if (Math.abs(streamVel) < 1e-3) streamVel = 0;
+}
+
+function upload() {
+  const B = uniforms.uBlobs.value, S = uniforms.uShape.value, P = uniforms.uPlanes.value;
+  for (let i = 0; i < N; i++) {
+    const b = blobs[i];
+    B[i].set(b.x, b.y, b.z, b.r); S[i].set(b.phase, b.sx, b.sy, b.hover);
+    const cs = [];
+    for (let j = 0; j < N; j++) {
+      if (j === i) continue;
+      const c = blobs[j], dx = c.x - b.x, dy = c.y - b.y, dz = c.z - b.z, d = Math.hypot(dx, dy, dz) || 1e-4;
+      const reach = (b.r + c.r) * 1.12;
+      if (d >= reach) continue;
+      const h = (d * d + b.r * b.r - c.r * c.r) / (2 * d) - 0.012;     // radical plane, minus a hair for a visible seam
+      const ease = (reach - d) / (reach - (b.r + c.r) * 0.98);          // fade the plane in as bodies approach
+      cs.push({ o: reach - d, n: [dx / d, dy / d, dz / d], h: h + Math.max(0, 1 - ease) * b.r * 0.6 });
+    }
+    cs.sort((a, c) => c.o - a.o);
+    for (let k = 0; k < 3; k++) {
+      const c = cs[k];
+      if (c) P[i * 3 + k].set(c.n[0], c.n[1], c.n[2], c.h); else P[i * 3 + k].set(0, 0, 0, 1e3);
+    }
+  }
+}
+
+/* ───────────── Label ───────────── */
+const label = $('#label');
+function fillLabel(b) {
+  const p = PROJECTS[b.proj];
+  label.querySelector('.meta').textContent = `Project ${String(b.proj + 1).padStart(2, '0')}${p.year ? ' / ' + p.year : ''}`;
+  label.querySelector('.title').textContent = p.title;
+  label.querySelector('.blurb').textContent = p.blurb ?? '';
+  label.querySelector('.tags').textContent = (p.tags ?? []).join(' · ');
+  label.querySelector('.open').href = p.url;
+}
+function select(b) { selected = b; label.classList.toggle('touch', !!b); if (b) fillLabel(b); }
+let labelFor = null;
+function placeLabel() {
+  const b = selected || hovered;
+  if (!b || (ptr.grab && ptr.moved)) { label.classList.remove('on'); labelFor = null; canvas.style.cursor = ptr.grab ? 'grabbing' : ''; return; }
+  if (labelFor !== b || labelFor.proj !== b.proj) { fillLabel(b); labelFor = b; }
+  const px = (b.x / aspect * 0.5 + 0.5) * W, py = (1 - (b.y * 0.5 + 0.5)) * H, rp = b.r * H / 2;
+  const w = label.offsetWidth, h = label.offsetHeight;
+  let x = px + rp + 8; if (x + w > W - 12) x = px - rp - 8 - w; if (x < 12) x = Math.min(Math.max(12, px - w / 2), W - w - 12);
+  let y = Math.min(Math.max(12, py - h / 2), H - h - 12);
+  if (x > px - rp - w && x < px + rp) y = py + rp + 8 + h > H - 12 ? py - rp - 8 - h : py + rp + 8;   // narrow screens: go above/below
+  label.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+  label.classList.add('on'); canvas.style.cursor = 'pointer';
+}
+
+/* ───────────── Input: several ways to move the Field ───────────── */
+const toWorld = (e) => [(e.clientX / W * 2 - 1) * aspect, -(e.clientY / H * 2 - 1)];
+function pick(x, y) {
+  let best = null;
+  for (const b of blobs) if (Math.hypot(b.x - x, b.y - y) < b.r * 0.95 && (!best || b.z > best.z)) best = b;
+  return best;
+}
+canvas.addEventListener('pointerdown', (e) => {
+  canvas.setPointerCapture(e.pointerId);
+  [ptr.x, ptr.y] = toWorld(e);
+  Object.assign(ptr, { down: true, moved: false, type: e.pointerType, sx: e.clientX, sy: e.clientY, lastY: ptr.y, lastT: performance.now(), inside: true });
+  ptr.grab = pick(ptr.x, ptr.y); ptr.streaming = false;
+});
+canvas.addEventListener('pointermove', (e) => {
+  const [x, y] = toWorld(e); ptr.type = e.pointerType; ptr.inside = true;
+  if (ptr.down) {
+    if (!ptr.moved && Math.hypot(e.clientX - ptr.sx, e.clientY - ptr.sy) > 6) { ptr.moved = true; if (!ptr.grab) ptr.streaming = true; }
+    if (ptr.streaming) {                       // dragging empty space drives the Stream
+      const now = performance.now(), dy = y - ptr.lastY, dtm = Math.max(1, now - ptr.lastT) / 1000;
+      for (const b of blobs) b.y += dy;
+      streamVel = streamVel * 0.6 + (dy / dtm) * 0.4;
+      ptr.lastY = y; ptr.lastT = now;
+    }
+  } else if (e.pointerType === 'mouse') hovered = pick(x, y);
+  ptr.x = x; ptr.y = y;
+});
+function release(e) {
+  if (!ptr.down) return;
+  const b = ptr.grab, wasTap = !ptr.moved;
+  Object.assign(ptr, { down: false, grab: null, streaming: false });
+  if (!wasTap) return;                         // a press that moved is a drag: never opens anything
+  if (!b) { select(null); return; }
+  if (e.pointerType === 'mouse') window.open(PROJECTS[b.proj].url, '_blank', 'noopener');
+  else if (selected === b) window.open(PROJECTS[b.proj].url, '_blank', 'noopener');
+  else select(b);                              // touch: first tap shows the Label, second opens
+}
+canvas.addEventListener('pointerup', release);
+canvas.addEventListener('pointercancel', () => Object.assign(ptr, { down: false, grab: null, streaming: false }));
+canvas.addEventListener('pointerleave', () => { ptr.inside = false; if (!ptr.down) hovered = null; });
+addEventListener('wheel', (e) => {
+  if (document.body.classList.contains('index-open')) return;
+  e.preventDefault();
+  const d = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY;
+  streamVel += Math.max(-400, Math.min(400, d)) * 0.012;
+}, { passive: false });
+addEventListener('keydown', (e) => {
+  const k = { ArrowDown: 1.6, PageDown: 4, ' ': 4, ArrowUp: -1.6, PageUp: -4 }[e.key];
+  if (k && !document.body.classList.contains('index-open') && document.activeElement.tagName !== 'BUTTON') { streamVel += k; e.preventDefault(); }
+  if (e.key === 'Escape') { select(null); document.body.classList.contains('index-open') && $('#indexBtn').click(); }
+});
+
+/* ───────────── Loop, with automatic step-down on slow devices ───────────── */
+let last = performance.now(), acc = 0, frames = 0;
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  step(dt); upload(); placeLabel();
+  uniforms.uTime.value = REDUCED ? 0 : time;
+  renderer.render(scene, cam);
+  acc += dt; frames++;
+  if (frames === 45) {
+    if (acc / frames > 0.024 && quality > 0.45) { quality *= 0.8; layout(); }
+    acc = 0; frames = 0;
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+window.__field = { blobs, get quality() { return quality; } };
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "createdAt": "2026-11-12T05:11:53.410Z",
+        "reason": "user confirmed: accepted Inter as the free substitute for the Reference's body face in the design interview (Q8)"
+      }
+    ]
+  }
+}
