@@ -26,6 +26,25 @@
   a { color: inherit; }
   canvas#field { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; opacity: 0; transition: opacity 0.9s ease; }
   body.ready canvas#field { opacity: 1; }
+  /* -- Loader: one breathing Blob while the Field compiles (round 05, variant B) -- */
+  #loader { position: fixed; inset: 0; z-index: 20; pointer-events: none; --p: 0; }
+
+  #loader { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
+  #loader .blob { width: 112px; height: 112px;
+    background: radial-gradient(circle at 34% 28%, #e4dfda 0%, #b9b4ae 32%, #5d5a55 66%, #1e1f1a 100%);
+    box-shadow: inset -7px -9px 16px rgba(245,194,200,.28);
+    animation: morph 3.2s ease-in-out infinite, breathe 1.6s ease-in-out infinite;
+    transition: transform .9s cubic-bezier(.5,0,.2,1), opacity .7s ease; }
+  @keyframes morph {
+    0%,100% { border-radius: 46% 54% 52% 48% / 52% 44% 56% 48%; }
+    33% { border-radius: 58% 42% 46% 54% / 44% 58% 42% 56%; }
+    66% { border-radius: 42% 58% 56% 44% / 56% 46% 54% 44%; } }
+  @keyframes breathe { 0%,100% { scale: 1; } 50% { scale: 1.05 .97; } }
+  #loader .tele { color: var(--bone); transition: opacity .4s; }
+  #loader.done .blob { transform: scale(2.4); opacity: 0; }
+  #loader.done .tele { opacity: 0; }
+  @media (prefers-reduced-motion: reduce) { #loader .blob { animation: none; } #loader.done .blob { transform: none; } }
+
   .tele { font: 12px/1.25 var(--font-mono); letter-spacing: -0.6px; text-transform: uppercase; }
   .corner { position: fixed; display: flex; flex-direction: column; gap: var(--gap); pointer-events: none; z-index: 2; }
   .corner a, .corner button { pointer-events: auto; }
@@ -90,6 +109,32 @@
 
 <canvas id="field" aria-hidden="true"></canvas>
 
+<div id="loader" aria-live="polite"><div class="blob"></div><span class="tele">Loading <span class="pct">0%</span></span></div>
+<script>
+/* Loader: a plain script, so it runs before the Field's module and three.js have downloaded. */
+(function () {
+  const L = document.getElementById('loader'), t0 = performance.now(), MIN = 1400;
+  let target = 0, shown = 0, stage = 'page', finished = false;
+  function render(p) { L.querySelector('.pct').textContent = Math.round(p) + '%'; }
+  // ease the shown number toward real progress so it counts rather than jumps
+  (function tick() {
+    shown += (target - shown) * 0.12; if (target - shown < 0.3) shown = target;
+    L.style.setProperty('--p', shown / 100); render(shown, stage);
+    if (shown < 100) requestAnimationFrame(tick);
+  })();
+  window.__load = (p, s) => { if (p > target) { target = p; stage = s; } };
+  window.__loaded = () => {
+    if (finished) return; finished = true; __load(100, 'ready');
+    const wait = Math.max(0, MIN - (performance.now() - t0));
+    setTimeout(() => { L.classList.add('done'); document.body.classList.add('ready'); setTimeout(() => L.remove(), 1400); }, wait + 300);
+  };
+  __load(10, 'page');
+  if (document.fonts) document.fonts.ready.then(() => __load(30, 'fonts'));
+  addEventListener('error', () => __loaded());   // WebGL or network failure: show the Index, never trap anyone
+  setTimeout(() => __loaded(), 12000);
+})();
+</script>
+
 <div class="corner tl"><a class="wordmark" href="#">YOUR NAME</a></div>
 
 <div class="corner tr">
@@ -129,6 +174,7 @@
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 
+__load(55, 'engine');
 /* The Project List lives in projects.js: the only file edited to add work. */
 import { PROJECTS } from './projects.js';
 
@@ -147,12 +193,12 @@ const M = {
   combo:    { drift: 0.110, pace: 1.40, visc: 1.4, stiff: 56, cdamp: 1.2, wob: 0.110, wobSpeed: 1.40, follow: 17, fill: 2.00 },
   crowded:  { drift: 0.070, pace: 1.00, visc: 2.4, stiff: 34, cdamp: 2.5, wob: 0.085, wobSpeed: 1.00, follow: 14, fill: 2.30 },
 }[MOTION];
-const VARIANTS = []; // final candidate: no variants
+const VARIANTS = []; // the live site has no variant switcher
 
 /* ───────────── Corner chrome ───────────── */
 const $ = (s) => document.querySelector(s);
 $('#variants').innerHTML = VARIANTS.map((v, i) =>
-  `<a class="pill" href="${v.file}" ${v.key === LAYOUT ? 'aria-current="page"' : ''}>${v.name}</a>`).join('');
+  `<a class="pill" href="${v.file}" ${false ? 'aria-current="page"' : ''}>${v.name}</a>`).join('');
 $('#indexList').innerHTML = PROJECTS.map((p, i) =>
   `<li><span class="tele">${String(i + 1).padStart(2, '0')}${p.tags ? ' · ' + p.tags.join(' · ') : ''}</span>
    <a href="${p.url}" target="_blank" rel="noopener">${p.title}</a><span>${p.blurb ?? ''}</span></li>`).join('');
@@ -503,8 +549,10 @@ addEventListener('keydown', (e) => {
 // Compile the shader before the first frame (in parallel where the browser supports it),
 // so the page never freezes on a synchronous compile.
 await renderer.compileAsync(scene, cam).catch(() => {});
+__load(85, 'shader');
 // Let the Blobs settle out of their starting column before anyone sees them.
 for (let i = 0; i < 90; i++) step(1 / 60);
+__load(95, 'settle');
 let last = performance.now(), acc = 0, frames = 0, shown = 0, checks = 0;
 function frame(now) {
   const raw = now - last; last = now;
@@ -520,7 +568,7 @@ function frame(now) {
     else if (avg < 12 && quality < 1 && checks >= 4) { quality = Math.min(1, quality * 1.1); layout(); }  // win sharpness back
     acc = 0; frames = 0; checks++;
   }
-  if (++shown === 12) document.body.classList.add('ready');
+  if (++shown === 12) __loaded();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
